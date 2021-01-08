@@ -1,4 +1,34 @@
 $(document).ready(function () {
+    let token = undefined;
+    let msg = "";
+
+    if (performance.navigation.type == performance.navigation.TYPE_RELOAD) {
+        $.ajax({
+            url:'http://localhost:3000/user/checkToken',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            type:"POST",
+            dataType: 'json',
+            data: { token : localStorage.getItem('token') },
+            success: function(response){
+                console.log(response);
+                if(parseInt(response.status) <= 299){
+                    token = response.token;
+                    $("#logout_btn").show();
+                    $("label").hide();
+                    $('#login_btn').hide();
+                    $('nav').hide();
+                    $("#login_message").html("Login Succesfully");
+                }
+                else{
+                    msg = "Incorrect username or password!";
+                    $("#login_message").html(msg);
+                }
+            }
+        });
+    }
+
     $("#login_btn").click(function () {
         console.log("log in pressed");
         let username = $("#username").val().trim();
@@ -13,10 +43,13 @@ $(document).ready(function () {
             data: { username:username, password:password },
             success: function(response){
                 console.log(response);
-                var msg = "";
                 if(parseInt(response.status) <= 299){
+                    token = response.token;
                     msg = "Login Succesfully";
+                    localStorage.setItem('token', token);
                     $("#logout_btn").show();
+                    $("label").hide();
+                    $('nav').hide();
                     $('#login_btn').hide();
                 }
                 else{
@@ -26,6 +59,7 @@ $(document).ready(function () {
             }
         });
     });
+    
     $("#register_btn").click(function () {
         console.log("register pressed");
         let username = $("#register_username").val().trim();
@@ -67,15 +101,18 @@ $(document).ready(function () {
             success: function(response){
                 console.log(response);
                 var msg = "";
-                // if(parseInt(response.status) <= 299){
-                //     msg = "Logout Succesfully";
-                //     $("#logout_btn").hide();
-                //     $('#login_btn').show();
-                // }
-                // else{
-                //     msg = "Logout Unsuccesfully";
-                // }
-                // $("#login_message").html(msg);
+                if(parseInt(response.status) <= 299){
+                    msg = "Logout Succesfully";
+                    localStorage.removeItem('token');
+                    $("#logout_btn").hide();
+                    $("label").show();
+                    $('nav').show();
+                    $('#login_btn').show();
+                }
+                else{
+                    msg = "Logout Unsuccesfully";
+                }
+                $("#login_message").html(msg);
             }
         });
     });

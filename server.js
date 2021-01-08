@@ -6,11 +6,19 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const moment = require('moment');
 var cors = require('cors');
+var session = require('express-session');
 const saltRounds = 10;
+let clientToken = "";
 require("dotenv").config();
 app.use(cors());
 app.use(bodyParser.urlencoded({extended : true}));
 app.use(bodyParser.json());
+app.use(session({
+    secret: 'keyboard cat',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: true }
+}))
 
 const db = mysql.createConnection({
     host: "localhost",
@@ -29,6 +37,20 @@ db.connect( (error) => {
 })
 
 app.get("/", (req, res) => {
+    // console.log(req.session.user);
+    // if(!req.session.user){
+    //     res.json({ status : 404, message: "You have to log in first"});
+    // }
+    // else{
+    //     db.query('SELECT * FROM user', function(error, user) {
+    //         if(error){ 
+    //             res.send(error);
+    //         }
+    //         if (user.length > 0) {
+    //             res.json(user);
+    //         }         
+    //     });
+    // }
     db.query('SELECT * FROM user', function(error, user) {
         if(error){ 
             res.send(error);
@@ -51,8 +73,10 @@ app.post("/user/login", (req, res) => {
             if (user.length > 0) {
                 bcrypt.compare(password, user[0].password, function(err, result) {
                     if(result){
+                        req.session.user = user;
+                        console.log("User", req.session.user);
                         db.query("UPDATE user SET last_login = CURRENT_TIMESTAMP WHERE username = ?", [username]);
-                        const token = jwt.sign({ username }, process.env.JWT_SECRET_TOKEN, {
+                        clientToken = jwt.sign({ username }, process.env.JWT_SECRET_TOKEN, {
                             expiresIn: process.env.JWT_EXPIRE_IN
                         });
                         
@@ -61,9 +85,9 @@ app.post("/user/login", (req, res) => {
                             httpOnly: true
                         }
 
-                        res.cookie('jwt', token, cookieOptions);
+                        res.cookie('jwt', clientToken, cookieOptions);
                         // res.status(200).redirect('/');
-                        res.json({ status : 200, token: token, message: "User logged in", user : user[0]});
+                        res.json({ status : 200, token: clientToken, message: "User logged in", user : user[0]});
                     }
                     else{
                         res.json({ status : 404, message: "Incorrect Password"});
@@ -107,16 +131,18 @@ app.post("/user/register", (req, res) => {
 
 //---------------------------- Logout ----------------------------
 app.get('/user/logout', (req, res) => {
-    // req.session.destroy(function(err){  
-    //     if(err){  
-    //         console.log(err);  
-    //     }  
-    //     else{  
-    //         res.redirect('/');  
-    //     }  
-    // });
-    delete req.session; 
-    res.send("Hello");
+    req.session.destroy(function(err){  
+        res.json({ status : 200, message: "Logout Successfully" });
+    });
+})
+
+//-------------------------- Check Token --------------------------
+app.post('/user/checkToken', (req, res) => {
+    let token = req.body.token;
+    if(token == clientToken && token != null) {
+        return res.json({ status : 200, token: token, message: "Stay Logged In" });
+    }
+    return res.json({ status : 404, token: null, message: "Logged Out" });
 })
 
 //----------------------------- Port -----------------------------
